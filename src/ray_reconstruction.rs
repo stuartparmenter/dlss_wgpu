@@ -161,6 +161,15 @@ impl DlssRayReconstruction {
         let mut screen_space_subsurface_scattering_guide = render_parameters
             .screen_space_subsurface_scattering_guide
             .map(|guide| texture_to_ngx(guide, adapter));
+        let mut responsivity_mask = render_parameters
+            .responsivity_mask
+            .map(|mask| texture_to_ngx(mask, adapter));
+        let mut alpha = render_parameters
+            .alpha
+            .map(|alpha| texture_to_ngx(alpha, adapter));
+        let mut dlss_output_alpha = render_parameters
+            .dlss_output_alpha
+            .map(|alpha| texture_to_ngx(alpha, adapter));
         let mut specular_motion_vectors = None;
         let mut specular_hit_distance = None;
         let mut world_to_view = None;
@@ -182,15 +191,19 @@ impl DlssRayReconstruction {
 
         // TODO: We may want to expose some more of these
         let mut eval_params = NVSDK_NGX_VK_DLSSD_Eval_Params {
-            pInResponsivityMask: ptr::null_mut(),
+            pInResponsivityMask: responsivity_mask
+                .as_mut()
+                .map_or(ptr::null_mut(), ptr::from_mut),
             pInDiffuseAlbedo: &mut diffuse_albedo,
             pInSpecularAlbedo: &mut specular_albedo,
             pInNormals: &mut normals,
             pInRoughness: roughness.as_mut().map_or(ptr::null_mut(), ptr::from_mut),
             pInColor: &mut color,
-            pInAlpha: ptr::null_mut(),
+            pInAlpha: alpha.as_mut().map_or(ptr::null_mut(), ptr::from_mut),
             pInOutput: &mut dlss_output,
-            pInOutputAlpha: ptr::null_mut(),
+            pInOutputAlpha: dlss_output_alpha
+                .as_mut()
+                .map_or(ptr::null_mut(), ptr::from_mut),
             pInDepth: &mut depth,
             pInMotionVectors: &mut motion_vectors,
             InJitterOffsetX: render_parameters.jitter_offset[0],
@@ -419,6 +432,18 @@ pub struct DlssRayReconstructionRenderParameters<'a> {
     pub screen_space_subsurface_scattering_guide: Option<&'a TextureView>,
     /// Optional per-pixel bias to make DLSS more reactive.
     pub bias: Option<&'a TextureView>,
+    /// Optional per-pixel hint to make DLSS more or less responsive.
+    ///
+    /// See section 3.4.14 of `$DLSS_SDK/doc/DLSS-RR Integration Guide.pdf` for how to calculate this texture.
+    pub responsivity_mask: Option<&'a TextureView>,
+    /// Optional alpha texture to upscale, instead of the alpha channel of [`Self::color`].
+    ///
+    /// Requires [`DlssFeatureFlags::AlphaUpscaling`].
+    pub alpha: Option<&'a TextureView>,
+    /// Optional texture DLSS outputs alpha to, instead of the alpha channel of [`Self::dlss_output`].
+    ///
+    /// Requires [`DlssFeatureFlags::AlphaUpscaling`].
+    pub dlss_output_alpha: Option<&'a TextureView>,
     /// The texture DLSS outputs to.
     pub dlss_output: &'a TextureView,
     /// Whether DLSS should reset temporal history, useful for camera cuts.
@@ -462,6 +487,14 @@ impl<'a> DlssRayReconstructionRenderParameters<'a> {
             }
         }
 
+        fn storage_barrier(texture_view: &TextureView) -> TextureTransition<&Texture> {
+            TextureTransition {
+                texture: texture_view.texture(),
+                selector: None,
+                state: TextureUses::STORAGE_READ_WRITE,
+            }
+        }
+
         [
             Some(resource_barrier(self.diffuse_albedo)),
             Some(resource_barrier(self.specular_albedo)),
@@ -482,11 +515,10 @@ impl<'a> DlssRayReconstructionRenderParameters<'a> {
             self.screen_space_subsurface_scattering_guide
                 .map(resource_barrier),
             self.bias.map(resource_barrier),
-            Some(TextureTransition {
-                texture: self.dlss_output.texture(),
-                selector: None,
-                state: TextureUses::STORAGE_READ_WRITE,
-            }),
+            self.responsivity_mask.map(resource_barrier),
+            self.alpha.map(resource_barrier),
+            Some(storage_barrier(self.dlss_output)),
+            self.dlss_output_alpha.map(storage_barrier),
         ]
         .into_iter()
         .flatten()

@@ -1,4 +1,9 @@
-# Unreleased
+# v6.0.0
+
+* Bump DLSS SDK to v310.9.1
+* Bump bindgen to 0.73
+* Add support for aarch64 on Linux and Windows
+* Add `responsivity_mask`, `alpha`, and `dlss_output_alpha` to `DlssRayReconstructionRenderParameters`
 * Fix dlss_wgpu incorrectly turning errors into Result::Ok(())
 * Add DlssError::Unknown
 

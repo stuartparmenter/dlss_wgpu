@@ -1,9 +1,9 @@
 # v6.0.0
 
 * Bump DLSS SDK to v310.9.1
-* Bump bindgen to 0.73
 * Add support for aarch64 on Linux and Windows
-* Add `responsivity_mask`, `alpha`, and `dlss_output_alpha` to `DlssRayReconstructionRenderParameters`
+* Add `transparency_overlay`, `color_before_transparency`, `depth_of_field_guide`, `responsivity_mask`, `alpha`, and `dlss_output_alpha` to `DlssRayReconstructionRenderParameters`
+* `DlssRayReconstruction::new` now returns an error if `DlssFeatureFlags::AutoExposure` is set
 * Fix dlss_wgpu incorrectly turning errors into Result::Ok(())
 * Add DlssError::Unknown
 

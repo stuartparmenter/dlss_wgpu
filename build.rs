@@ -14,7 +14,7 @@ fn main() {
     let vulkan_sdk = env::var("VULKAN_SDK").expect("VULKAN_SDK environment variable not set");
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-    // SDK folder names match rustc arch names
+    // Determine platform info
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
     let platform = if target_os == "windows" {
@@ -27,7 +27,6 @@ fn main() {
     // Link to needed libraries
     let mut lib_dir = format!("{dlss_sdk}/lib/{platform}");
     if target_os == "windows" && target_arch == "x86_64" {
-        // Only x86_64 has an x64 subfolder
         lib_dir.push_str("/x64");
     }
     if !Path::new(&lib_dir).is_dir() {
